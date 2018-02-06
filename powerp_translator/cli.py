@@ -1,4 +1,7 @@
 from ooservice import OpenERPService, Transaction
+from base64 import decodestring
+from os.path import isdir
+from os import makedirs
 
 import time
 import logging
@@ -40,18 +43,53 @@ def transexport(modules=[], verbose=False, debug=False):
     )
     oerp_service = OpenERPService()
     dbname = oerp_service.db_name
+    logger.debug('DB_NAME: {}'.format(dbname))
     addons_path = oerp_service.config['addons_path']
+    logger.debug('ADDONS_PATH: {}'.format(addons_path))
     root_path = oerp_service.config['root_path']
+    logger.debug('ROOT_PATH: {}'.format(root_path))
     try:
         for module_name in modules:
-            logger.debug('Testing module {}'.format(module_name))
+            logger.debug('Exporting module {}'.format(module_name))
             with Transaction().start(
                     database_name=dbname
             ) as temp:
                 temp.service.install_module(module_name)
-                pass
+                uid = temp.user
+                pool = temp.pool
+                cursor = temp.cursor
+                module_obj = pool.get('ir.module.module')
+                export_wizard_obj = pool.get('wizard.module.lang.export')
+                module_id = module_obj.search(cursor, uid, [
+                    ('name', '=', module_name)
+                ])
+                if len(module_id) > 1:
+                    logger.warn(
+                        'More than one module found with this name: "{}"!'
+                        ''.format(module_name))
+                    module_id = module_id[0]
+                if not len(module_id):
+                    logger.error('Module "{}" not found with this name'.format(
+                        module_name
+                    ))
+                    continue
+                wizard_id = export_wizard_obj.create(cursor, uid, {
+                    'format': 'po',
+                    'modules': [(6, 0, module_id)]
+                })
+                wizard = export_wizard_obj.browse(cursor, uid, wizard_id)
+                wizard.act_getfile()
+                if not isdir(join(addons_path, module_name, 'i18n')):
+                    makedirs(join(addons_path, module_name, 'i18n'))
+                with open(
+                    join(addons_path, module_name, 'i18n', module_name+'.pot'),
+                    'w'
+                ) as potfile:
+                    potfile.write(decodestring(wizard.data))
+                
     finally:
         oerp_service.drop_database()
+        logger.debug('Removed temp database {}'.format(dbname))
 
 
 if __name__ == '__main__':
