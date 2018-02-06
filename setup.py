@@ -8,6 +8,7 @@ setup(
     url='https://github.com/gisce/destral',
     install_requires=[
         'osconf',
+        'python-dateutil'
         'mamba',
         'coverage',
         'babel>=2.4.0'
