@@ -2,9 +2,9 @@ import logging
 import time
 
 from osconf import config_from_environment
-from powerp-translator.utils import update_config
+from powerp_translator.utils import update_config
 
-logger = logging.getLogger('destral.openerp')
+logger = logging.getLogger('powerp_translator.openerp')
 DEFAULT_USER = 1
 """Default user id
 """
@@ -15,6 +15,21 @@ def patched_pool_jobs(*args, **kwargs):
     """
     logger.debug('Patched ir.cron')
     return False
+
+
+class TestDatabase(object):
+
+    def __init__(self, module, service, dbname=False):
+        self.module = module
+        self.dbname = dbname or 'translate_{}_'.format(module)
+        self.service = service
+        self.service.db_name = self.service.create_database(dbname=self.dbname)
+    
+    def __enter__(self):
+        return self.dbname
+
+    def __exit__(self, a, b, c):
+        self.service.drop_database()
 
 
 class OpenERPService(object):
@@ -44,12 +59,12 @@ class OpenERPService(object):
         # Stop the cron
         netsvc.Agent.quit()
 
-    def create_database(self, template=True):
+    def create_database(self, dbname=False, template=False):
         """Creates a new database.
 
         :param template: use a template (name must be `base`) (default True)
         """
-        db_name = 'test_' + str(int(time.time()))
+        db_name = (dbname or 'translate_') + str(int(time.time()))
         import sql_db
         conn = sql_db.db_connect('postgres')
         cursor = conn.cursor()
