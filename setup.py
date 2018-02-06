@@ -12,7 +12,8 @@ setup(
         'python-dateutil',
         'mamba',
         'coverage',
-        'babel>=2.4.0'
+        'babel>=2.4.0',
+        'git+https://github.com/gisce/ooservice.git'
     ],
     entry_points={
         'console_scripts': [
